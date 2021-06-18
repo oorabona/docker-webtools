@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+
+BASE_IMAGE=
+PACKAGES_VERSIONS_FILE=versions.vars
+PLATFORMS=linux/amd64
+
+case "$#" in
+  "0" )
+    cat << eof
+$(basename $0) <base-image> [packages-versions-file] [platforms]
+
+- base-image is the fully qualified base image to build on.
+  From this value is infered whether 'alpine' or 'debian' installation methods.
+
+- packages-versions-file contains for each package the strategy to download its
+  source code. It can be either a version pinned, a branch name, or 'latest'
+  to automatically retrieve its latest tag.
+
+  By default the file used is 'versions.vars', have a look and tweak it :)
+
+  Note: this only works for GitHub hosted source code.
+
+- platforms is a comma separated list of platforms to build the source.
+  By default platforms $(echo "${PLATFORMS%,*} and ${PLATFORMS##*,}") are built, 'all' is accepted.
+eof
+    exit 1
+    ;;
+  "1" )
+    BASE_IMAGE=$1
+    ;;
+  "2" )
+    BASE_IMAGE=$1
+    PACKAGES_VERSIONS_FILE=$2
+    ;;
+  "3" )
+    BASE_IMAGE=$1
+    PACKAGES_VERSIONS_FILE=$2
+    PLATFORMS=$3
+    ;;
+  * )
+    echo "Wrong number of arguments. Rerun without argument to see help."
+    exit 1
+esac
+
+if [ -z "$BASE_IMAGE" ]
+then
+  echo "Base image is mandatory, please refer to README.md for details."
+  exit 1
+else
+  echo "Using this base image : ${BASE_IMAGE}"
+fi
+
+if [ ! -r "$PACKAGES_VERSIONS_FILE" ]
+then
+  echo "Cannot read packages versions file : ${PACKAGES_VERSIONS_FILE}. Aborting!"
+  exit 1
+fi
+
+source "$PACKAGES_VERSIONS_FILE"
+
+OS=
+
+case "$BASE_IMAGE" in
+  "buster" ) ;&
+  "stretch" )
+    OS=debian
+    ;;
+  "alpine" )
+    OS=alpine
+    BASE_IMAGE=latest
+    ;;
+  * )
+    echo "Could not match '${BASE_IMAGE}' to a supported image base."
+    exit 1
+esac
+
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+docker buildx create --name builder --driver docker-container --use
+docker buildx inspect --bootstrap
+
+docker buildx build --push --build-arg PACKAGES_VERSIONS_FILE=${PACKAGES_VERSIONS_FILE} --build-arg BASE_IMAGE=${BASE_IMAGE} --platform=${PLATFORMS} -f ${OS}.dockerfile -t oorabona/webtools:${PKG_VERSION}-${OS} -t oorabona/webtools:${OS} .
+
+docker buildx rm builder
+
+echo "Completed build !"
+exit 0
