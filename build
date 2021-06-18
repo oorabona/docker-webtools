@@ -59,15 +59,18 @@ fi
 source "$PACKAGES_VERSIONS_FILE"
 
 OS=
+TAG=
 
 case "$BASE_IMAGE" in
   "buster" ) ;&
   "stretch" )
     OS=debian
+    TAG=$BASE_IMAGE
     ;;
   "alpine" )
     OS=alpine
     BASE_IMAGE=latest
+    TAG=alpine
     ;;
   * )
     echo "Could not match '${BASE_IMAGE}' to a supported image base."
@@ -78,7 +81,7 @@ docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 docker buildx create --name builder --driver docker-container --use
 docker buildx inspect --bootstrap
 
-docker buildx build --push --build-arg PACKAGES_VERSIONS_FILE=${PACKAGES_VERSIONS_FILE} --build-arg BASE_IMAGE=${BASE_IMAGE} --platform=${PLATFORMS} -f ${OS}.dockerfile -t oorabona/webtools:${PKG_VERSION}-${BASE_IMAGE} -t oorabona/webtools:${BASE_IMAGE} .
+docker buildx build --push --build-arg PACKAGES_VERSIONS_FILE=${PACKAGES_VERSIONS_FILE} --build-arg BASE_IMAGE=${BASE_IMAGE} --platform=${PLATFORMS} -f ${OS}.dockerfile -t oorabona/webtools:${PKG_VERSION}-${TAG} -t oorabona/webtools:${TAG} .
 
 docker buildx rm builder
 
