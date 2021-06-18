@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+
+case "$#" in
+  "0" ) ;&
+  "1" )
+    cat << eof
+$(basename $0) <account> <repo> [packages-versions-file]
+
+- account is the GitHub account
+
+- repo is the repository name under that account
+
+- packages-versions-file contains for each package the strategy to download its
+  source code. It can be either a version pinned, a branch name, or 'latest'
+  to automatically retrieve its latest tag.
+
+  By default the file used is '${PACKAGES_VERSIONS_FILE}', have a look and tweak it :)
+
+Note: this only works for GitHub hosted source code.
+eof
+    exit 1
+    ;;
+  "2" )
+    ACCOUNT=$1
+    REPO=$2
+    ;;
+  "3" )
+    ACCOUNT=$1
+    REPO=$2
+    PACKAGES_VERSIONS_FILE=$3
+    ;;
+  * )
+    echo "Wrong number of arguments. Rerun without argument to see help."
+    exit 1
+esac
+
+# Check if we can call external scripts
+if [[ -z "$(which git_latest_tag)" ]]; then
+  echo "Could not find our dependency... trying to source it."
+  source "$(dirname $0)/git-tags"
+fi
+
+# Find our packages versions file ...
+if [[ ! -r "/etc/${PACKAGES_VERSIONS_FILE}" ]]; then
+  if [[ ! -r "${PACKAGES_VERSIONS_FILE}" ]]; then
+    echo "Could not read packages versions file neither in '/etc/${PACKAGES_VERSIONS_FILE}' nor in the current directory! Aborting."
+    exit 1
+  else
+    source "${PACKAGES_VERSIONS_FILE}"
+  fi
+else
+  source "/etc/${PACKAGES_VERSIONS_FILE}"
+fi
+
+if [[ -z "$PKG_VERSION" ]]; then
+  echo "Could not read version number from packages versions. Is the file correct ?"
+  exit 1
+fi
+
+echo "Found packages file version ${PKG_VERSION} !"
+
+STRATEGY=${versions[$REPO]}
+
+if [[ -z "$STRATEGY" ]]; then
+  echo "Could not find a strategy for $REPO ! Aborting."
+  exit 1
+fi
+
+echo -n "I should look for '${STRATEGY}' branch/version... "
+
+case "$STRATEGY" in
+  "latest" )
+    BRANCH_OR_TAG=$(git_latest_tag $ACCOUNT $REPO)
+    if [ -z "$BRANCH_OR_TAG" ]; then
+      echo "not found! Aborting."
+      exit 1
+    fi
+    echo "found the latest version: ${BRANCH_OR_TAG}"
+    ;;
+  * )
+    BRANCH_OR_TAG=$(git_check_branch $ACCOUNT $REPO $STRATEGY)
+    if [ -z "$BRANCH_OR_TAG" ]; then
+      echo -n "branch not found, "
+      BRANCH_OR_TAG=$(git_check_tag $ACCOUNT $REPO $STRATEGY)
+      if [ -z "$BRANCH_OR_TAG" ]; then
+        echo "tag/version not found! Aborting."
+        exit 1
+      else
+        echo "tag/version '${BRANCH_OR_TAG}' found."
+      fi
+    else
+      echo "branch '${BRANCH_OR_TAG}' found."
+    fi
+    ;;
+esac
+
+echo "Downloading and untar to $(pwd) ..."
+curl -fSL https://github.com/${ACCOUNT}/${REPO}/tarball/${BRANCH_OR_TAG} -o - | tar zxvf -
