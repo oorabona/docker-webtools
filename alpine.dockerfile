@@ -1,5 +1,7 @@
 ARG BASE_IMAGE="latest"
 
+FROM ruby:3-alpine AS ruby
+
 FROM alpine:${BASE_IMAGE}
 
 ARG PACKAGES_VERSIONS_FILE="versions.vars"
@@ -19,7 +21,7 @@ RUN apk add --no-cache \
      libc-dev \
      linux-headers \
      libcurl \
-     ruby-dev \
+     yaml-dev \
      libffi-dev \
      procps \
      sqlite-dev \
@@ -45,9 +47,12 @@ RUN apk add --no-cache \
   && python3 -m ensurepip \
   && rm -r /usr/lib/python*/ensurepip \
   && pip3 install --no-cache --upgrade pip setuptools wheel \
-  && if [ ! -e /usr/bin/pip ]; then ln -s /usr/bin/pip3 /usr/bin/pip ; fi \
-  && echo "install: --no-document --no-post-install-message\nupdate: --no-document --no-post-install-message" > /etc/gemrc
+  && if [ ! -e /usr/bin/pip ]; then ln -s /usr/bin/pip3 /usr/bin/pip ; fi
 
+# Not sure whether it would still be needed...
+#  && echo "install: --no-document --no-post-install-message\nupdate: --no-document --no-post-install-message" > /etc/gemrc
+
+COPY --from=ruby /usr/local/ /usr/local
 COPY helpers/ /usr/local/bin
 COPY ${PACKAGES_VERSIONS_FILE} /etc
 
@@ -103,10 +108,6 @@ ENV BUNDLE_SILENCE_ROOT_WARNING=1 \
 ENV PATH $GEM_HOME/bin:$PATH
 # adjust permissions of a few directories for running "gem install" as an arbitrary user
 RUN mkdir -p "$GEM_HOME" && chmod 777 "$GEM_HOME"
-
-COPY --from=ruby:2-alpine /usr/local/lib/ /usr/local/lib/
-COPY --from=ruby:2-alpine /usr/local/bin/ /usr/local/bin/
-COPY --from=ruby:2-alpine /usr/local/include/ /usr/local/include/
 
 RUN  get-package urbanadventurer WhatWeb \
   && cd urbanadventurer-WhatWeb* \
