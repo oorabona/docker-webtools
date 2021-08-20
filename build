@@ -2,7 +2,7 @@
 
 BASE_IMAGE=
 PACKAGES_VERSIONS_FILE=versions.vars
-PLATFORMS=linux/amd64
+PLATFORMS=linux/amd64,linux/arm/v7
 
 case "$#" in
   "0" )
