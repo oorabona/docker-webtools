@@ -38,6 +38,8 @@ RUN apk add --no-cache \
      zlib \
      zlib-dev \
      python3 \
+     python3-dev \
+     zeromq-dev \
   && ln -s /usr/include/linux/types.h /usr/include/bits/types.h \
   && if [ ! -e /usr/bin/python ]; then ln -sf /usr/bin/python3 /usr/bin/python ; fi \
   && python3 -m ensurepip \
@@ -135,5 +137,7 @@ RUN  get-package sullo nikto \
 
 RUN  get-package sqlmapproject sqlmap \
   && mv sqlmap* /sqlmap
+
+RUN  pip3 install locust
 
 ENV PATH=$PATH:/nikto:/sqlmap
